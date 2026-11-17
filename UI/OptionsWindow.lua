@@ -94,6 +94,8 @@ function ns:ToggleOptions()
 
     local db = self.db or _G.EzWoW_UtilityBarDB
     configFrame = CreateFrame("Frame", "EzWoWUtilityBarConfig", UIParent, "BackdropTemplate")
+    -- (taller than the screen: shrunk to fit, Libs/EzWoWGamePad)
+    if ns.GamePad and ns.GamePad.KeepOnScreen then ns.GamePad.KeepOnScreen(configFrame) end
     configFrame:SetSize(420, 764)
     configFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     configFrame:SetFrameStrata("FULLSCREEN_DIALOG")
