@@ -949,7 +949,6 @@ frame:SetScript("OnEvent", function(_, event, arg1)
             ns:RegisterBlizzardOptions()
         end
         ns:RefreshToolbar()
-        ns.Print(ns:L("loaded"))
     elseif event == "PLAYER_REGEN_ENABLED" then
         if ns.pendingKeyDown then
             ToolbarController.ApplyKeyDownSetting()
