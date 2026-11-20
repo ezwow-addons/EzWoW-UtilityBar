@@ -99,6 +99,27 @@ function ToolbarController.GetCooldownInfo(entry)
     return tonumber(start) or 0, tonumber(duration) or 0, enabled, false
 end
 
+-- In combat the game gives spell cooldowns as secret values that addon code can't read.
+-- The game's DurationObject draws them without reading (C_Spell.GetSpellCooldownDuration +
+-- Cooldown:SetCooldownFromDurationObject); otherwise the secret values go to SetCooldown.
+-- Returns how it was drawn ("duration" / "secret") or nil when neither worked.
+function ToolbarController.DrawSecretCooldown(b, start, duration)
+    local entry, cd = b.entry, b.cooldown
+    if not cd then return nil end
+    -- (no finish flash here: drawn again on every cooldown change in combat, the flash
+    -- kept going off on the icons; the normal path turns it back on)
+    if cd.SetDrawBling then pcall(cd.SetDrawBling, cd, false) end
+    if entry and entry.type == "spell" and C_Spell and type(C_Spell.GetSpellCooldownDuration) == "function"
+        and type(cd.SetCooldownFromDurationObject) == "function" then
+        local ok, durationObject = pcall(C_Spell.GetSpellCooldownDuration, entry.id)
+        if ok and durationObject and pcall(cd.SetCooldownFromDurationObject, cd, durationObject) then
+            return "duration"
+        end
+    end
+    if cd.SetCooldown and pcall(cd.SetCooldown, cd, start, duration) then return "secret" end
+    return nil
+end
+
 function ToolbarController.IsEntryUsable(entry)
     if entry.type == "spell" then
         if C_Spell and type(C_Spell.IsSpellUsable) == "function" then
@@ -356,6 +377,7 @@ function ToolbarController.BindEntryToButton(b, entry, size)
     b.hideBtn:Hide()
     b.lastStart = nil
     b.lastDuration = nil
+    b.secretDrawn = nil
     b.lastCount = nil
     b:Show()
 end
@@ -481,15 +503,20 @@ function ns:UpdateVisuals()
             local start, duration, _, secret = ToolbarController.GetCooldownInfo(b.entry)
             local onCD = false
             if secret then
-                if b.cooldown.SetCooldown then
-                    pcall(b.cooldown.SetCooldown, b.cooldown, start, duration)
+                -- (secret values can't be compared: drawn again only when the game says a cooldown
+                -- changed, not on every poll)
+                if ns.cooldownChanged or not b.secretDrawn then
+                    ToolbarController.DrawSecretCooldown(b, start, duration)
+                    b.secretDrawn = true
                 end
                 b.cooldown:Show()
                 b.lastStart, b.lastDuration = nil, nil
             else
+                b.secretDrawn = nil
                 onCD = start > 0 and duration > 0 and (start + duration) > (now + 0.05)
                 if onCD then
                     if b.lastStart ~= start or b.lastDuration ~= duration then
+                        if b.cooldown.SetDrawBling then b.cooldown:SetDrawBling(true) end
                         if CooldownFrame_Set then
                             CooldownFrame_Set(b.cooldown, start, duration, 1)
                         elseif b.cooldown.SetCooldown then
@@ -517,6 +544,7 @@ function ns:UpdateVisuals()
             b.icon:SetVertexColor(1, 1, 1, 1)
         end
     end
+    ns.cooldownChanged = false
 end
 
 -----------------------------------------------------------------------------
@@ -972,6 +1000,11 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         or event == "PLAYER_TARGET_CHANGED"
         or event == "UPDATE_SHAPESHIFT_FORM"
         or event == "BAG_UPDATE_COOLDOWN" then
+        -- (the cooldowns drawn from secret values in combat are drawn again only on these)
+        if event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_COOLDOWN"
+            or event == "BAG_UPDATE_COOLDOWN" or event == "UPDATE_SHAPESHIFT_FORM" then
+            ns.cooldownChanged = true
+        end
         if ns.db then ns:UpdateVisuals() end
     elseif ns.db then
         ns:RequestRefresh()
