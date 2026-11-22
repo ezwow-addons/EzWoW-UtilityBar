@@ -1,9 +1,9 @@
-# v2.0.23
+# v2.0.24
 
 ### 한국어
-- 접속 직후 공유용 채널이 공개 채널의 번호(1번)를 차지할 수 있던 문제를 고쳤습니다.
-- 전투 중에 기술 버튼의 재사용 대기시간이 표시되지 않거나 멈춰 있고, 아이콘이 계속 번쩍이던 문제를 고쳤습니다.
+- 테두리와 버튼은 제목 줄에 마우스를 1초 올려 두면 나옵니다(지나가기만 할 때는 나오지 않음).
+- 게임의 채팅 채널 창을 열 때 "조금 천천히" 경고가 뜨던 문제를 수정했습니다.
 
 ### English
-- Fixed the data-sharing channel possibly taking General's number (1) right after login.
-- Fixed spell button cooldowns not showing or not updating in combat, and icons flashing over and over.
+- The frame and buttons now appear after keeping the mouse on the title bar for 1 second (not when just passing over).
+- Fixed a "slow down" warning when opening the game's chat channel window.
