@@ -35,9 +35,9 @@ WoW Forever (`Interface: 16001`) · `/ezub`
 
 | 번호 | 부분 | 설명 |
 |---|---|---|
-| ① | 제목 줄 | 마우스를 올리면 **전체 접기/펼치기 · 잠금/해제 · 설정(⚙)** 버튼과 조작 안내 툴팁이 나타납니다. 잠금 해제 상태에서는 제목을 **좌클릭 드래그**, 잠긴 상태에서는 **Ctrl + 드래그**로 단축바를 옮깁니다. |
+| ① | 제목 줄 | 마우스를 올리면 조작 안내 툴팁이 나오고, **1초 동안** 올려 두면 테두리와 **전체 접기/펼치기 · 잠금/해제 · 설정(⚙)** 버튼이 나타나 마우스가 단축바 안에 있는 동안 유지됩니다. 잠금 해제 상태에서는 제목을 **좌클릭 드래그**, 잠긴 상태에서는 **Ctrl + 드래그**로 단축바를 옮깁니다. |
 | ② | 분류 헤더 | `v 분류 이름 | 개수` 형태입니다. 클릭하면 그 분류를 접고 펼치며, 상태는 저장됩니다. 잠금을 풀면 헤더를 위·아래로 끌어서 **분류 순서**를 바꿀 수 있습니다. |
-| ③ | 아이콘 숨기기 | 잠금 해제 상태에서 제목에 마우스를 올리면 아이콘 오른쪽 위에 작은 **x**가 생깁니다. 누르면 그 아이콘만 숨겨집니다. 설정창의 **숨긴 아이콘 복원**으로 되돌립니다. |
+| ③ | 아이콘 숨기기 | 잠금 해제 상태에서 제목에 마우스를 1초 동안 올려 두면 아이콘 오른쪽 위에 작은 **x**가 생깁니다. 누르면 그 아이콘만 숨겨집니다. 설정창의 **숨긴 아이콘 복원**으로 되돌립니다. |
 | ④ | 접힌 분류 | `>` 표시와 개수만 보입니다. 다시 누르면 펼쳐집니다. |
 | ⑤ | 크기 조절 · 재고 경고 | 잠금 해제 상태에서 오른쪽 아래 모서리를 끌어 너비·높이를 직접 바꿉니다. 수량이 얼마 남지 않은 소모품·직업 재료·탄약은 숫자가 **빨간색**으로 바뀝니다. |
 
@@ -155,9 +155,9 @@ Utility Bar **collects usable bag items, equipped on-use gear, professions, form
 
 | No. | Part | Description |
 |---|---|---|
-| ① | Title bar | Hover to reveal **collapse/expand all · lock/unlock · settings (⚙)** and a controls tooltip. While unlocked, **left-drag** the title to move the bar; while locked, use **Ctrl + drag**. |
+| ① | Title bar | Hover for a controls tooltip; keep the mouse on it for **1 second** to bring up the frame and **collapse/expand all · lock/unlock · settings (⚙)**, which stay while the mouse is on the bar. While unlocked, **left-drag** the title to move the bar; while locked, use **Ctrl + drag**. |
 | ② | Category header | Shows `v Name | count`. Click to collapse/expand (saved). While unlocked, drag a header up or down to **reorder categories**. |
-| ③ | Hide an icon | While unlocked, hover the title and a small **x** appears on each icon. Click it to hide that icon. Bring icons back with **Restore hidden icons**. |
+| ③ | Hide an icon | While unlocked, keep the mouse on the title for 1 second and a small **x** appears on each icon. Click it to hide that icon. Bring icons back with **Restore hidden icons**. |
 | ④ | Collapsed category | Shows `>` and the count only. Click again to expand. |
 | ⑤ | Resize · low stock | While unlocked, drag the bottom-right corner to set width/height. Consumables, reagents and ammo that are running low show a **red** count. |
 

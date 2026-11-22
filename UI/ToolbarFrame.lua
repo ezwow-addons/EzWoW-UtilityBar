@@ -13,6 +13,15 @@ local draggingCategory = nil
 local draggingTitle = false
 local hoverUI = false
 local hoverExitElapsed = 0
+-- The bar's frame, outline and buttons come up only after the mouse has stayed on the title for
+-- TITLE_HOVER_DELAY seconds (2026-11-22, user: passing over the title lit the bar up); dragging the
+-- title brings them at once. Once up they stay while the mouse is on the bar.
+local TITLE_HOVER_DELAY = 1
+local titleHoverSince = nil
+function ToolbarController.titleHoverDue(since, now, overTitle)
+    if not overTitle or type(since) ~= "number" or type(now) ~= "number" then return false end
+    return now - since >= TITLE_HOVER_DELAY
+end
 
 -----------------------------------------------------------------------------
 -- Main Frame Creation
@@ -663,6 +672,7 @@ titleHover:SetScript("OnDragStart", function()
     if ns.db.locked and not IsControlKeyDown() then return end
     draggingTitle = true
     frame:StartMoving()
+    if not hoverUI then ns:ShowHoverUI(true) end
 end)
 titleHover:SetScript("OnDragStop", function()
     if not draggingTitle then return end
@@ -713,7 +723,7 @@ function ns:ShowHoverUI(show)
 end
 
 titleHover:SetScript("OnEnter", function(self)
-    ns:ShowHoverUI(true)
+    titleHoverSince = GetTime()
     GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
     GameTooltip:SetText("EzWoW - Utility Bar", 0.788, 0.643, 0.937)
     GameTooltip:AddLine(ns:L("helpMove"), 0.929, 0.957, 0.969, true)
@@ -722,6 +732,7 @@ titleHover:SetScript("OnEnter", function(self)
     GameTooltip:Show()
 end)
 titleHover:SetScript("OnLeave", function()
+    titleHoverSince = nil
     GameTooltip:Hide()
 end)
 
@@ -898,7 +909,16 @@ frame:SetScript("OnUpdate", function(_, elapsed)
         end
     end
 
-    -- 2. Hover Reveal Auto-Exit
+    -- 2. Hover Reveal: on after TITLE_HOVER_DELAY on the title, off when the mouse leaves the bar
+    if not hoverUI and titleHoverSince then
+        local overTitle = titleHover:IsMouseOver()
+        if not overTitle then
+            titleHoverSince = nil
+        elseif ToolbarController.titleHoverDue(titleHoverSince, GetTime(), overTitle) then
+            titleHoverSince = nil
+            ns:ShowHoverUI(true)
+        end
+    end
     if hoverUI then
         if draggingTitle or draggingCategory or frame:IsMouseOver() or (resizeHandle.IsMouseOver and resizeHandle:IsMouseOver()) then
             hoverExitElapsed = 0
