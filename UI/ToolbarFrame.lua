@@ -984,6 +984,8 @@ frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 frame:RegisterEvent("BAG_UPDATE_COOLDOWN")
 frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+-- (C_Item.RequestLoadItemDataByID answers only with ITEM_DATA_LOAD_RESULT on this client, 2026-11-22)
+pcall(frame.RegisterEvent, frame, "ITEM_DATA_LOAD_RESULT")
 pcall(frame.RegisterEvent, frame, "CVAR_UPDATE")
 
 frame:SetScript("OnEvent", function(_, event, arg1)
@@ -1008,7 +1010,7 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         if arg1 == "ActionButtonUseKeyDown" or arg1 == "ACTION_BUTTON_USE_KEY_DOWN" then
             ToolbarController.ApplyKeyDownSetting()
         end
-    elseif event == "GET_ITEM_INFO_RECEIVED" then
+    elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
         if arg1 and ns.waitingItems[arg1] then
             ns.waitingItems[arg1] = nil
             if ns.db then ns:RequestRefresh() end

@@ -26,6 +26,7 @@ One compact bar for WoW Forever that **collects usable bag items, equipped on-us
 - Secure action buttons: they work in combat, and follow the game's "cast on key down" option. In combat the layout stays put and only counts update; used-up items are dimmed and cleared after combat.
 - Drag the title to move (Ctrl + drag while locked); drag the corner to resize while unlocked; icon size, icons per row, opacity, show on mouseover.
 - Locking makes the background transparent and keeps the bar from moving by accident.
+- The frame and buttons appear after you keep the mouse on the title bar for 1 second (not when you just pass over it).
 - Recipe items are left off the bar.
 
 ### Auto-summon companion pet (off by default)
@@ -72,6 +73,7 @@ Languages: English, 한국어, Deutsch, Français, Español, Русский, 简
 - 선택: 내 레벨에서 쓸 수 있는 최고 등급 음식 · 물약 · 붕대만, 분류 없이 합쳐 보기, 위로 펼치기.
 - 보안 액션 버튼이라 전투 중에도 동작하고, 게임의 "키를 누를 때 시전" 설정을 따릅니다. 전투 중에는 목록을 그대로 두고 수량만 갱신하며, 다 쓴 아이템은 반투명하게 두었다가 전투가 끝나면 정리합니다.
 - 제목을 끌어 이동(잠긴 상태에서는 Ctrl + 드래그), 잠금 해제 상태에서 모서리로 크기 조절, 아이콘 크기 · 한 줄 개수 · 불투명도 · 마우스 올릴 때만 표시.
+- 테두리와 버튼은 제목 줄에 마우스를 1초 올려 두면 나옵니다(지나가기만 할 때는 나오지 않음).
 - 잠그면 배경이 투명해지고 실수로 움직이지 않습니다.
 - 제조법 아이템은 단축바에 넣지 않습니다.
 
