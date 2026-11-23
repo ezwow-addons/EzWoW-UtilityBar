@@ -858,6 +858,8 @@ end
 -- OnUpdate Drivers & Events
 -----------------------------------------------------------------------------
 local visualTimer = 0
+local VISUAL_MIN_GAP = 0.05
+local sinceVisual = VISUAL_MIN_GAP
 
 frame:SetScript("OnUpdate", function(_, elapsed)
     local db = ns.db or _G.EzWoW_UtilityBarDB
@@ -946,10 +948,13 @@ frame:SetScript("OnUpdate", function(_, elapsed)
         frame:SetAlpha(curAlpha)
     end
 
-    -- 4. Periodic Visual Cooldown/Count Poll
+    -- 4. Periodic Visual Cooldown/Count Poll, and the redraw asked for by events: at most once per
+    -- VISUAL_MIN_GAP (2026-11-22: power, usable and cooldown events redrew every icon several times a frame,
+    -- 2.3 ms per frame on average in the addon profiler)
     visualTimer = visualTimer + elapsed
-    if visualTimer >= 0.25 then
-        visualTimer = 0
+    sinceVisual = sinceVisual + elapsed
+    if visualTimer >= 0.25 or (ns.visualsDirty and sinceVisual >= VISUAL_MIN_GAP) then
+        visualTimer, sinceVisual, ns.visualsDirty = 0, 0, false
         ns:UpdateVisuals()
     end
 end)
@@ -1027,7 +1032,8 @@ frame:SetScript("OnEvent", function(_, event, arg1)
             or event == "BAG_UPDATE_COOLDOWN" or event == "UPDATE_SHAPESHIFT_FORM" then
             ns.cooldownChanged = true
         end
-        if ns.db then ns:UpdateVisuals() end
+        -- drawn on the next frame (OnUpdate above), once for all the events of that moment
+        ns.visualsDirty = true
     elseif ns.db then
         ns:RequestRefresh()
     end
