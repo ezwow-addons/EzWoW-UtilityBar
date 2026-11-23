@@ -1,7 +1,7 @@
-# v2.0.25
+# v2.0.26
 
 ### 한국어
-- 아이템 정보가 늦게 들어오면 단축바 아이콘이 갱신되지 않던 문제를 수정했습니다.
+- 재사용 대기시간·개수 표시를 다시 그리는 횟수를 줄여 게임 부담을 낮췄습니다.
 
 ### English
-- Fixed bar icons not updating when item details arrived late.
+- Reduced how often cooldowns and counts are redrawn, lowering the load on the game.
