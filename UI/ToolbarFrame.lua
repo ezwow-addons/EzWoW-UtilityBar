@@ -23,6 +23,31 @@ function ToolbarController.titleHoverDue(since, now, overTitle)
     return now - since >= TITLE_HOVER_DELAY
 end
 
+-- An icon's tooltip comes once the mouse rests on it for TOOLTIP_DELAY seconds (2026-11-24, user: the game
+-- stuttered while the mouse moved over the bar). Every icon the mouse crossed built a whole item tooltip:
+-- with the gear comparison and every addon's lines that is 20-80 ms (13 ms without them), so a mouse
+-- sweeping the bar dropped frame after frame. The OnUpdate below shows the tooltip of the icon still
+-- waiting; leaving the icon takes the wait back.
+-- The wait is EzWoW - Tooltip's show delay for every tooltip (its option, 0.25 s by default) and
+-- TOOLTIP_DELAY without it; never under MIN_TOOLTIP_DELAY, so crossing the bar builds nothing. The bar
+-- waits itself and then asks EzWoW - Tooltip to show that tooltip at once (no second wait).
+ToolbarController.TOOLTIP_DELAY = 0.25
+ToolbarController.MIN_TOOLTIP_DELAY = 0.15
+local pendingTip, pendingTipDue = nil, 0
+function ToolbarController.tooltipDue(button, due, now)
+    return button ~= nil and type(due) == "number" and type(now) == "number" and now >= due
+end
+function ToolbarController.tooltipDelay()
+    local tipAddon = _G.EzWoW_Tooltip
+    if type(tipAddon) == "table" and type(tipAddon.ShowDelay) == "function" then
+        local ok, d = pcall(tipAddon.ShowDelay)
+        if ok and type(d) == "number" then
+            return math.max(ToolbarController.MIN_TOOLTIP_DELAY, d)
+        end
+    end
+    return ToolbarController.TOOLTIP_DELAY
+end
+
 -----------------------------------------------------------------------------
 -- Main Frame Creation
 -----------------------------------------------------------------------------
@@ -331,20 +356,13 @@ function ToolbarController.AcquireActionButton(index)
         if ns.hoverUIActive and ns.db and not ns.db.locked then
             self.hideBtn:Show()
         end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if self.entry.type == "item" then
-            if self.entry.inventorySlot and GameTooltip.SetInventoryItem then
-                GameTooltip:SetInventoryItem("player", self.entry.inventorySlot)
-            elseif GameTooltip.SetItemByID then
-                GameTooltip:SetItemByID(self.entry.id)
-            end
-        elseif GameTooltip.SetSpellByID then
-            GameTooltip:SetSpellByID(self.entry.id)
-        end
-        GameTooltip:Show()
+        pendingTip, pendingTipDue = self, GetTime() + ToolbarController.tooltipDelay()
     end)
     b:SetScript("OnLeave", function(self)
-        GameTooltip:Hide()
+        if pendingTip == self then pendingTip = nil end
+        if not GameTooltip.IsOwned or GameTooltip:IsOwned(self) then
+            GameTooltip:Hide()
+        end
         if not self.hideBtn:IsMouseOver() then
             self.hideBtn:Hide()
         end
@@ -352,6 +370,26 @@ function ToolbarController.AcquireActionButton(index)
 
     buttons[index] = b
     return b
+end
+
+function ToolbarController.ShowEntryTooltip(b)
+    local entry = b.entry
+    if not entry then return end
+    local tipAddon = _G.EzWoW_Tooltip
+    if type(tipAddon) == "table" and type(tipAddon.ShowNextWithoutDelay) == "function" then
+        pcall(tipAddon.ShowNextWithoutDelay, b)
+    end
+    GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+    if entry.type == "item" then
+        if entry.inventorySlot and GameTooltip.SetInventoryItem then
+            GameTooltip:SetInventoryItem("player", entry.inventorySlot)
+        elseif GameTooltip.SetItemByID then
+            GameTooltip:SetItemByID(entry.id)
+        end
+    elseif GameTooltip.SetSpellByID then
+        GameTooltip:SetSpellByID(entry.id)
+    end
+    GameTooltip:Show()
 end
 
 function ToolbarController.BindEntryToButton(b, entry, size)
@@ -864,6 +902,13 @@ local sinceVisual = VISUAL_MIN_GAP
 frame:SetScript("OnUpdate", function(_, elapsed)
     local db = ns.db or _G.EzWoW_UtilityBarDB
     if not db then return end
+
+    -- 0. The tooltip of the icon the mouse rests on (TOOLTIP_DELAY)
+    if pendingTip and ToolbarController.tooltipDue(pendingTip, pendingTipDue, GetTime()) then
+        local b = pendingTip
+        pendingTip = nil
+        if b:IsVisible() and b.entry then ToolbarController.ShowEntryTooltip(b) end
+    end
 
     -- 1. Category Drag Reordering
     if draggingCategory then
