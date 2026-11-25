@@ -39,7 +39,7 @@ WoW Forever (`Interface: 16001`) · `/ezub`
 | ② | 분류 헤더 | `v 분류 이름 | 개수` 형태입니다. 클릭하면 그 분류를 접고 펼치며, 상태는 저장됩니다. 잠금을 풀면 헤더를 위·아래로 끌어서 **분류 순서**를 바꿀 수 있습니다. |
 | ③ | 아이콘 숨기기 | 잠금 해제 상태에서 제목에 마우스를 1초 동안 올려 두면 아이콘 오른쪽 위에 작은 **x**가 생깁니다. 누르면 그 아이콘만 숨겨집니다. 설정창의 **숨긴 아이콘 복원**으로 되돌립니다. |
 | ④ | 접힌 분류 | `>` 표시와 개수만 보입니다. 다시 누르면 펼쳐집니다. |
-| ⑤ | 크기 조절 · 재고 경고 | 잠금 해제 상태에서 오른쪽 아래 모서리를 끌어 너비·높이를 직접 바꿉니다. 수량이 얼마 남지 않은 소모품·직업 재료·탄약은 숫자가 **빨간색**으로 바뀝니다. |
+| ⑤ | 크기 조절 · 재고 경고 | 잠금 해제 상태에서 오른쪽 아래 모서리를 끌어 너비·높이를 직접 바꿉니다. 아이콘의 숫자는 기본 단축바처럼 남은 사용 횟수입니다(충전 아이템은 남은 충전 수, 재료가 필요한 아이템은 재료로 쓸 수 있는 횟수). 수량이 얼마 남지 않은 소모품·직업 재료·탄약은 숫자가 **빨간색**으로 바뀝니다. |
 
 #### 자동 분류 (15개)
 
@@ -159,7 +159,7 @@ Utility Bar **collects usable bag items, equipped on-use gear, professions, form
 | ② | Category header | Shows `v Name | count`. Click to collapse/expand (saved). While unlocked, drag a header up or down to **reorder categories**. |
 | ③ | Hide an icon | While unlocked, keep the mouse on the title for 1 second and a small **x** appears on each icon. Click it to hide that icon. Bring icons back with **Restore hidden icons**. |
 | ④ | Collapsed category | Shows `>` and the count only. Click again to expand. |
-| ⑤ | Resize · low stock | While unlocked, drag the bottom-right corner to set width/height. Consumables, reagents and ammo that are running low show a **red** count. |
+| ⑤ | Resize · low stock | While unlocked, drag the bottom-right corner to set width/height. The number on an icon is the uses left, as on the game's action bar (charges for items with charges, reagent uses for items that take reagents). Consumables, reagents and ammo that are running low show a **red** count. |
 
 #### Automatic categories (15)
 

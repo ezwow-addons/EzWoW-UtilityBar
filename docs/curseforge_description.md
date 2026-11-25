@@ -21,6 +21,7 @@ One compact bar for WoW Forever that **collects usable bag items, equipped on-us
 - 15 automatic categories: potions & stones, equipped gear, elixirs & scrolls, weapon buffs, food & drink, bandages, camping, quest items, travel & mounts, engineering gadgets, chests & other, professions, forms & stances, class skills, reagents & ammo.
 - Click a category header to fold it; unlock the bar and drag headers to reorder them.
 - Hide single icons with a small x (while unlocked) and restore them from the settings.
+- Item icons show the uses left, like the game's action bar (charges and reagents included, 1 too).
 - Red counts when consumables, reagents or ammo run low.
 - Optional: best food, potion and bandage for your level only; all icons without categories; grow upward.
 - Secure action buttons: they work in combat, and follow the game's "cast on key down" option. In combat the layout stays put and only counts update; used-up items are dimmed and cleared after combat.
@@ -69,6 +70,7 @@ Languages: English, 한국어, Deutsch, Français, Español, Русский, 简
 - 자동 분류 15개: 물약 · 생명석, 착용 장비, 비약 · 영약 · 두루마리, 무기 강화, 음식 · 음료, 붕대, 야영, 퀘스트, 이동 수단, 기계공학 장치, 상자 · 기타, 전문기술, 변신 · 태세, 직업 스킬, 직업 재료 · 탄약.
 - 분류 헤더를 누르면 접고 펼치고, 잠금을 풀면 헤더를 끌어 순서를 바꿉니다.
 - 잠금 해제 상태에서 작은 x로 아이콘을 하나씩 숨기고, 설정창에서 되돌립니다.
+- 아이템 아이콘에 남은 사용 횟수를 기본 단축바처럼 표시(충전·재료 횟수 포함, 1개도 표시).
 - 소모품 · 직업 재료 · 탄약이 얼마 남지 않으면 숫자가 빨간색.
 - 선택: 내 레벨에서 쓸 수 있는 최고 등급 음식 · 물약 · 붕대만, 분류 없이 합쳐 보기, 위로 펼치기.
 - 보안 액션 버튼이라 전투 중에도 동작하고, 게임의 "키를 누를 때 시전" 설정을 따릅니다. 전투 중에는 목록을 그대로 두고 수량만 갱신하며, 다 쓴 아이템은 반투명하게 두었다가 전투가 끝나면 정리합니다.

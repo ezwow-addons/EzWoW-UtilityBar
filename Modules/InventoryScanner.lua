@@ -204,14 +204,67 @@ function ns.IsItemEquippable(itemID)
     return ok and (res == true or res == 1)
 end
 
-function ns.GetSafeItemCount(itemID)
+-- includeUses: every use left of an item with charges counts (5 charges = 5), as on the game's action bar
+function ns.GetSafeItemCount(itemID, includeUses)
     local fn = (C_Item and C_Item.GetItemCount) or GetItemCount
     if type(fn) ~= "function" then return nil end
-    local ok, count = pcall(fn, itemID)
+    local ok, count = pcall(fn, itemID, false, includeUses and true or false)
     if ok and type(count) == "number" and not ns.IsSecret(count) then
         return count
     end
     return nil
+end
+
+-- Items whose use takes reagents (Evergreen Pouch needs Un'Goro Soil): the game's action bar counts the uses
+-- the reagents allow, not the item (1 pouch and no soil says 0). nil: not such an item, or no answer.
+local itemSpellCache = {}      -- itemID -> spell ID of its use (false: none)
+function ns.ItemReagentCasts(itemID)
+    local spellID = itemSpellCache[itemID]
+    if spellID == nil then
+        local spellFn = (C_Item and C_Item.GetItemSpell) or _G.GetItemSpell
+        if type(spellFn) ~= "function" then return nil end
+        local ok, name, id = pcall(spellFn, itemID)
+        if not ok or ns.IsSecret(name) or ns.IsSecret(id) then return nil end
+        id = tonumber(id)
+        -- (no name yet: the item's data is still loading, asked again next time)
+        if not id and not name then return nil end
+        spellID = id or false
+        itemSpellCache[itemID] = spellID
+    end
+    if not spellID then return nil end
+    local reagentFn = (C_Spell and C_Spell.IsConsumableSpell) or _G.IsConsumableSpell
+    if type(reagentFn) ~= "function" then return nil end
+    local ok, takesReagents = pcall(reagentFn, spellID)
+    if not ok or ns.IsSecret(takesReagents) or not takesReagents then return nil end
+    local countFn = (C_Spell and C_Spell.GetSpellCastCount) or _G.GetSpellCount
+    if type(countFn) ~= "function" then return nil end
+    local okCount, casts = pcall(countFn, spellID)
+    if okCount and type(casts) == "number" and not ns.IsSecret(casts) then return casts end
+    return nil
+end
+
+-- Items the game's action bar puts a number on even when one is left: used up when used (potions, quest
+-- items, things with charges) or stacking. Reusable things (Hearthstone, mount items) get none.
+local countedItemCache = {}
+function ns.IsCountedItem(itemID)
+    if not itemID then return false end
+    local known = countedItemCache[itemID]
+    if known ~= nil then return known end
+    local consumable, maxStack
+    local consumableFn = (C_Item and C_Item.IsConsumableItem) or _G.IsConsumableItem
+    if type(consumableFn) == "function" then
+        local ok, v = pcall(consumableFn, itemID)
+        if ok and v ~= nil and not ns.IsSecret(v) then consumable = (v == true or v == 1) end
+    end
+    local stackFn = C_Item and C_Item.GetItemMaxStackSizeByID
+    if type(stackFn) == "function" then
+        local ok, v = pcall(stackFn, itemID)
+        if ok and not ns.IsSecret(v) then maxStack = tonumber(v) end
+    end
+    local counted = consumable == true or (maxStack ~= nil and maxStack > 1)
+    -- (an answer missing means the item's data is still loading: asked again next time)
+    if counted or (consumable ~= nil and maxStack ~= nil) then countedItemCache[itemID] = counted end
+    return counted
 end
 
 function ns.GetEntryKey(entry)

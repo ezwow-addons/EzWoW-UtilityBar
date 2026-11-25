@@ -392,6 +392,29 @@ function ToolbarController.ShowEntryTooltip(b)
     GameTooltip:Show()
 end
 
+-- The number on an item icon, as on the game's action bar: every use left (an item with 5 charges says 5),
+-- shown even at 1 for things used up or stacking; reusable things (Hearthstone) only when there are several.
+-- byReagents: the uses come from the reagents the item takes; none left says 0, as on the action bar.
+function ToolbarController.CountText(entry, n, byReagents)
+    if n == 0 and byReagents then return "0" end
+    if type(n) ~= "number" or n <= 0 then return "" end
+    if n > 1 or byReagents or entry.category == "reagent" or ns.IsCountedItem(entry.id) then
+        return tostring(n)
+    end
+    return ""
+end
+
+-- Uses left of a bag item (nil: unknown), and true when they come from the reagents it takes.
+function ToolbarController.ItemUses(entry)
+    local n = ns.GetSafeItemCount(entry.id, true)
+    if not n then return nil, false end
+    if n > 0 then
+        local casts = ns.ItemReagentCasts(entry.id)
+        if casts then return casts, true end
+    end
+    return n, false
+end
+
 function ToolbarController.BindEntryToButton(b, entry, size)
     b.entry = entry
     b:ClearAllPoints()
@@ -401,15 +424,21 @@ function ToolbarController.BindEntryToButton(b, entry, size)
     b:SetAlpha(1)
 
     local db = ns.db or _G.EzWoW_UtilityBarDB
-    local isLow = db and db.lowStockWarn and entry.lowThreshold and entry.count and entry.count > 0 and entry.count <= entry.lowThreshold
+    local n, byReagents = entry.count, false
+    if entry.type == "item" and not entry.inventorySlot then
+        local uses
+        uses, byReagents = ToolbarController.ItemUses(entry)
+        n = uses or entry.count
+    end
+    local isLow = db and db.lowStockWarn and entry.lowThreshold and n and n > 0 and n <= entry.lowThreshold
     if isLow then
         b.border:SetVertexColor(0.90, 0.26, 0.22, 0.98)
         b.count:SetTextColor(1, 0.32, 0.32)
-        b.count:SetText(tostring(entry.count))
+        b.count:SetText(tostring(n))
     else
         b.border:SetVertexColor(ToolbarController.GetEntryBorderColor(entry))
         b.count:SetTextColor(1, 1, 1)
-        b.count:SetText(entry.count and (entry.count > 1 or entry.category == "reagent") and entry.count or "")
+        b.count:SetText(entry.type == "item" and ToolbarController.CountText(entry, n, byReagents) or "")
     end
 
     b:SetAttribute("type", entry.type)
@@ -527,12 +556,13 @@ function ns:UpdateVisuals()
         if b:IsShown() and b.entry then
             local empty = false
             if b.entry.type == "item" and not b.entry.inventorySlot then
-                local n = ns.GetSafeItemCount(b.entry.id)
+                local n, byReagents = ToolbarController.ItemUses(b.entry)
                 if n then
                     local low = db.lowStockWarn and b.entry.lowThreshold and n > 0 and n <= b.entry.lowThreshold
-                    if n ~= b.lastCount or low ~= b.lastLow then
+                    if n ~= b.lastCount or low ~= b.lastLow or byReagents ~= b.lastByReagents then
                         b.lastCount = n
                         b.lastLow = low
+                        b.lastByReagents = byReagents
                         if low then
                             b.border:SetVertexColor(0.90, 0.26, 0.22, 0.98)
                             b.count:SetTextColor(1, 0.32, 0.32)
@@ -540,7 +570,7 @@ function ns:UpdateVisuals()
                         else
                             b.border:SetVertexColor(ToolbarController.GetEntryBorderColor(b.entry))
                             b.count:SetTextColor(1, 1, 1)
-                            b.count:SetText((n > 1 or (n == 1 and b.entry.category == "reagent")) and n or "")
+                            b.count:SetText(ToolbarController.CountText(b.entry, n, byReagents))
                         end
                     end
                     empty = (n == 0)
