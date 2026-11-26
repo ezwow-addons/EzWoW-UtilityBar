@@ -595,6 +595,12 @@ SlashCmdList.EZWOWUTILITYBAR = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "refresh" then
         ns:RefreshToolbar()
+    elseif msg == "flicker" or msg == "깜박" then
+        -- developer check: the last icons that flickered (UI/ToolbarFrame.lua, Flicker)
+        if ns.Flicker then ns.Flicker.Show(5) end
+    elseif msg == "flicker clear" or msg == "깜박 지우기" then
+        db.devFlicker = nil
+        ns.Print("깜박임 기록을 지웠습니다.")
     elseif msg == "lock" then
         db.locked = not db.locked
         ns:RefreshToolbar()

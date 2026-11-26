@@ -193,6 +193,88 @@ function ToolbarController.IsEntryUsable(entry)
     return true, false
 end
 
+-- While the player casts or channels (and 0.5 s after), the game now and then answers "not usable" for
+-- every item (2026-11-26, flicker check: all icons went gray and back twice within a second while planting
+-- a seed pouch; the game's own action bar does not change). Such an answer is not used then: the icon
+-- keeps the look it had before the cast. A lack of mana still shows.
+local usableSeen = {}          -- "type:id" -> usable as last answered outside a cast
+local castSeenAt = -10
+local function castingNow(fn)
+    if type(fn) ~= "function" then return false end
+    local ok, v = pcall(fn, "player")
+    return (ok and (ns.IsSecret(v) or v ~= nil)) and true or false
+end
+
+function ToolbarController.PlayerCasting(now)
+    if castingNow(UnitCastingInfo) or castingNow(UnitChannelInfo) then castSeenAt = now end
+    return now - castSeenAt < 0.5
+end
+
+-- Outside a cast, too, the game answers "not usable" for every item for a moment while it is busy with
+-- an action (2026-11-26, flicker check: gray twice within a second while the bags sold items at a vendor,
+-- about 0.3 s each time). An icon that was usable turns gray only when that answer has lasted
+-- UNUSABLE_SETTLE; an icon seen for the first time, or gray already, follows the answer at once.
+local UNUSABLE_SETTLE = 0.6
+local unusableSince = {}       -- "type:id" -> when the game began to answer "not usable"
+
+-- An item whose data the game does not hold at the moment (other lookups pushed it out of the item
+-- cache) answers anything: such an answer changes nothing either way (2026-11-26, flicker check: gray
+-- icons turned bright and back twice within a second, with item data events at each change).
+function ToolbarController.ItemDataReady(entry)
+    if entry.type ~= "item" then return true end
+    local fn = C_Item and C_Item.IsItemDataCachedByID
+    if type(fn) ~= "function" then return true end
+    local ok, cached = pcall(fn, entry.id)
+    if not ok or ns.IsSecret(cached) then return true end
+    return cached ~= false
+end
+
+-- Such an item also answers "no cooldown" (2026-11-26, flicker check on a flight path and while dead:
+-- icons with a running cooldown went gray and back twice within a second, the cooldown gone each time
+-- the item data was missing). The cooldown drawn last stays until it runs out.
+function ToolbarController.KeptCooldown(b, start, duration, dataReady, now)
+    if dataReady ~= false or (start > 0 and duration > 0) then return start, duration end
+    local s, d = b.lastStart, b.lastDuration
+    if type(s) == "number" and type(d) == "number" and s + d > (tonumber(now) or 0) then
+        return s, d
+    end
+    return start, duration
+end
+
+-- the usable look of an icon (see above)
+function ToolbarController.ShownUsable(entry, usable, noResource, casting, now, dataReady)
+    local key = tostring(entry.type) .. ":" .. tostring(entry.id)
+    if dataReady == false and usableSeen[key] ~= nil then
+        unusableSince[key] = nil
+        return usableSeen[key]
+    end
+    if usable or noResource then
+        unusableSince[key] = nil
+        usableSeen[key] = usable
+        return usable
+    end
+    local before = usableSeen[key]
+    if casting then
+        unusableSince[key] = nil
+        if before == nil then return true end
+        return before
+    end
+    if before ~= true then
+        usableSeen[key] = false
+        return false
+    end
+    now = tonumber(now) or 0
+    local since = unusableSince[key]
+    if not since then
+        unusableSince[key] = now
+        return true
+    end
+    if now - since < UNUSABLE_SETTLE then return true end
+    unusableSince[key] = nil
+    usableSeen[key] = false
+    return false
+end
+
 function ToolbarController.IsActiveFormSpell(entry)
     if entry.type ~= "spell" or entry.category ~= "forms" then return false end
     if type(GetShapeshiftForm) ~= "function" or type(GetShapeshiftFormInfo) ~= "function" then return false end
@@ -545,18 +627,183 @@ function ToolbarController.AcquireCategoryHeader(groupKey)
 end
 
 -----------------------------------------------------------------------------
+-- Developer check: icons that flicker (2026-11-26, user: "the bar sometimes flickers gray")
+-- Only while the developer's data scanner (EzWoW-DataDumper) is loaded. An icon that turns into the
+-- same look (gray or bright) twice within FLICKER_WINDOW is written down with what the game answered
+-- at each of the three changes and what the player was doing, said in the chat and kept in
+-- EzWoW_UtilityBarDB.devFlicker (last FLICKER_KEEP; /ezub flicker shows the last ones).
+-----------------------------------------------------------------------------
+local Flicker = { events = {} }
+ns.Flicker = Flicker
+local FLICKER_WINDOW = 1       -- two turns into the same look within this (seconds)
+local FLICKER_QUIET = 3        -- the same icon is written down again only after this
+local FLICKER_KEEP = 100
+local FLICKER_EVENTS = 12
+
+-- true on the developer's PC (asked once, after the addons have loaded)
+function Flicker.On()
+    if Flicker.on == nil then
+        local fn = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G.IsAddOnLoaded
+        local ok, loaded = false, false
+        if type(fn) == "function" then ok, loaded = pcall(fn, "EzWoW-DataDumper") end
+        Flicker.on = (ok and loaded == true) and true or false
+    end
+    return Flicker.on
+end
+
+function Flicker.NoteEvent(event)
+    if not Flicker.on then return end
+    local list = Flicker.events
+    list[#list + 1] = { GetTime(), event }
+    if #list > FLICKER_EVENTS then table.remove(list, 1) end
+end
+
+local function plainValue(v)
+    if v == nil or ns.IsSecret(v) then return nil end
+    return v
+end
+
+local OPEN_WINDOWS = { "QuestFrame", "GossipFrame", "MerchantFrame", "LootFrame", "MailFrame", "TradeFrame",
+    "BankFrame", "TaxiFrame", "SpellBookFrame", "ProfessionsFrame", "TradeSkillFrame", "CharacterFrame",
+    "ContainerFrameCombinedBags", "StaticPopup1" }
+
+-- what the player was doing: combat, casting, flying, open windows, the events just before
+function Flicker.Context(now)
+    local parts = {}
+    local function add(s) parts[#parts + 1] = s end
+    local function ask(fn, ...)
+        if type(fn) ~= "function" then return nil end
+        local ok, v = pcall(fn, ...)
+        return ok and plainValue(v) or nil
+    end
+    if ask(InCombatLockdown) then add("전투") end
+    local cast = ask(UnitCastingInfo, "player")
+    if cast then add("시전 " .. tostring(cast)) end
+    local channel = ask(UnitChannelInfo, "player")
+    if channel then add("정신 집중 " .. tostring(channel)) end
+    if ask(UnitOnTaxi, "player") then add("비행 경로") end
+    if ask(IsMounted) then add("탈것") end
+    if ask(UnitIsDeadOrGhost, "player") then add("죽음") end
+    if ask(SpellIsTargeting) then add("대상 지정 중") end
+    local form = tonumber(ask(GetShapeshiftForm))
+    if form and form > 0 then add("변신 " .. form) end
+    local open = {}
+    for _, name in ipairs(OPEN_WINDOWS) do
+        local f = _G[name]
+        if type(f) == "table" and type(f.IsShown) == "function" then
+            local ok, shown = pcall(f.IsShown, f)
+            if ok and shown == true then open[#open + 1] = name end
+        end
+    end
+    if #open > 0 then add("열린 창 " .. table.concat(open, ",")) end
+    if (ns.lastFrameElapsed or 0) > 0.1 then add(string.format("직전 프레임 %.2f초", ns.lastFrameElapsed)) end
+    if ns.refreshedAt and now - ns.refreshedAt < 1 then add(string.format("다시 배치 %.2f초 전", now - ns.refreshedAt)) end
+    local events = {}
+    for _, e in ipairs(Flicker.events) do
+        if now - e[1] <= 0.6 then events[#events + 1] = e[2] end
+    end
+    if #events > 0 then add("이벤트 " .. table.concat(events, ",")) end
+    return table.concat(parts, " · ")
+end
+
+-- the icon's look and the game's answers that made it
+function Flicker.Why(blocked, usable, noResource, count, byReagents, onCD, active, gameUsable, dataReady)
+    local parts = { blocked and "회색" or "밝음", "쓸 수 있음 " .. tostring(usable) }
+    if gameUsable ~= nil and gameUsable ~= usable then parts[#parts + 1] = "게임 답 " .. tostring(gameUsable) .. "(잠깐인 답이라 안 씀)" end
+    if noResource then parts[#parts + 1] = "자원 부족" end
+    if count ~= nil then parts[#parts + 1] = "개수 " .. tostring(count) .. (byReagents and "(재료)" or "") end
+    if onCD then parts[#parts + 1] = "재사용 대기" end
+    if active then parts[#parts + 1] = "변신 중" end
+    if dataReady == false then parts[#parts + 1] = "아이템 정보 없음" end
+    return table.concat(parts, " · ")
+end
+
+-- One icon's look in this update. Returns a record when it turned into the same look twice within
+-- FLICKER_WINDOW (three changes: A -> B -> A -> B).
+function Flicker.Track(index, b, now, blocked, usable, noResource, count, byReagents, onCD, active, gameUsable, dataReady)
+    local entry = b.entry
+    local key = tostring(entry.type) .. ":" .. tostring(entry.id)
+    local tr = b.flicker
+    if not tr or tr.key ~= key then
+        b.flicker = { key = key, blocked = blocked, marks = {} }
+        return nil
+    end
+    if tr.blocked == blocked then return nil end
+    tr.blocked = blocked
+    local marks = tr.marks
+    marks[#marks + 1] = { t = now, why = Flicker.Why(blocked, usable, noResource, count, byReagents, onCD, active, gameUsable, dataReady),
+        ctx = Flicker.Context(now) }
+    while #marks > 3 do table.remove(marks, 1) end
+    if #marks < 3 or now - marks[1].t > FLICKER_WINDOW or now < (tr.quietUntil or 0) then return nil end
+    tr.quietUntil = now + FLICKER_QUIET
+    tr.marks = {}
+    local rec = {
+        at = date("%m-%d %H:%M:%S"),
+        icon = index,
+        name = tostring(entry.name or entry.id),
+        id = entry.id,
+        kind = entry.type,
+        look = blocked and "회색" or "밝음",
+        first = string.format("%.2f", marks[2].t - marks[1].t),   -- how long the first turn lasted
+        gap = string.format("%.2f", marks[3].t - marks[2].t),     -- until the second turn
+        m1 = marks[1].why .. " | " .. marks[1].ctx,
+        m2 = marks[2].why .. " | " .. marks[2].ctx,
+        m3 = marks[3].why .. " | " .. marks[3].ctx,
+    }
+    local db = ns.db
+    if db then
+        if type(db.devFlicker) ~= "table" then db.devFlicker = {} end
+        table.insert(db.devFlicker, rec)
+        while #db.devFlicker > FLICKER_KEEP do table.remove(db.devFlicker, 1) end
+    end
+    return rec
+end
+
+-- one chat line for the icons written down in one update
+function Flicker.Say(list)
+    if not list or #list == 0 then return end
+    local r = list[1]
+    local names = {}
+    for i = 1, math.min(#list, 4) do names[#names + 1] = list[i].name end
+    local more = (#list > 4) and string.format(" 외 %d칸", #list - 4) or ""
+    ns.Print(string.format("|cffF1BD57[깜박임 점검]|r %s%s: 1초 안에 %s 2번 (처음 %s초, 사이 %s초) · %s",
+        table.concat(names, ", "), more, r.look, r.first, r.gap, r.m1))
+end
+
+-- the last records in the chat (/ezub flicker)
+function Flicker.Show(count)
+    local list = ns.db and ns.db.devFlicker
+    if type(list) ~= "table" or #list == 0 then
+        ns.Print("깜박임 기록 없음" .. (Flicker.On() and "" or " (스캐너가 켜진 PC에서만 기록)"))
+        return
+    end
+    for i = math.max(1, #list - (count or 5) + 1), #list do
+        local r = list[i]
+        ns.Print(string.format("%s #%s %s: %s 2번 (처음 %s초, 사이 %s초)", r.at, tostring(r.icon), r.name, r.look, r.first, r.gap))
+        ns.Print("  1) " .. tostring(r.m1))
+        ns.Print("  2) " .. tostring(r.m2))
+        ns.Print("  3) " .. tostring(r.m3))
+    end
+end
+
+-----------------------------------------------------------------------------
 -- Visual State & Layout Refresh
 -----------------------------------------------------------------------------
 function ns:UpdateVisuals()
     local db = self.db or _G.EzWoW_UtilityBarDB
     if not db then return end
     local now = GetTime()
+    local flickerOn = Flicker.On()
+    local flickered = nil
+    local casting = ToolbarController.PlayerCasting(now)
 
-    for _, b in ipairs(buttons) do
+    for index, b in ipairs(buttons) do
         if b:IsShown() and b.entry then
             local empty = false
+            local shownCount, shownByReagents = nil, false
             if b.entry.type == "item" and not b.entry.inventorySlot then
                 local n, byReagents = ToolbarController.ItemUses(b.entry)
+                shownCount, shownByReagents = n, byReagents
                 if n then
                     local low = db.lowStockWarn and b.entry.lowThreshold and n > 0 and n <= b.entry.lowThreshold
                     if n ~= b.lastCount or low ~= b.lastLow or byReagents ~= b.lastByReagents then
@@ -577,7 +824,11 @@ function ns:UpdateVisuals()
                 end
             end
 
+            local dataReady = ToolbarController.ItemDataReady(b.entry)
             local start, duration, _, secret = ToolbarController.GetCooldownInfo(b.entry)
+            if not secret then
+                start, duration = ToolbarController.KeptCooldown(b, start, duration, dataReady, now)
+            end
             local onCD = false
             if secret then
                 -- (secret values can't be compared: drawn again only when the game says a cooldown
@@ -608,7 +859,8 @@ function ns:UpdateVisuals()
                 end
             end
 
-            local usable, noResource = ToolbarController.IsEntryUsable(b.entry)
+            local gameUsable, noResource = ToolbarController.IsEntryUsable(b.entry)
+            local usable = ToolbarController.ShownUsable(b.entry, gameUsable, noResource, casting, now, dataReady)
             local active = ToolbarController.IsActiveFormSpell(b.entry)
             local blocked = (not usable and not onCD and not active) or empty
 
@@ -619,9 +871,17 @@ function ns:UpdateVisuals()
                 edge:SetShown(active)
             end
             b.icon:SetVertexColor(1, 1, 1, 1)
+            if flickerOn then
+                local rec = Flicker.Track(index, b, now, blocked, usable, noResource, shownCount, shownByReagents, onCD, active, gameUsable, dataReady)
+                if rec then
+                    flickered = flickered or {}
+                    flickered[#flickered + 1] = rec
+                end
+            end
         end
     end
     ns.cooldownChanged = false
+    if flickered then Flicker.Say(flickered) end
 end
 
 -----------------------------------------------------------------------------
@@ -812,6 +1072,7 @@ function ns:RefreshToolbar()
         return
     end
     self.pendingRefresh = false
+    self.refreshedAt = GetTime()
 
     local entries = self:CollectEntries()
     local size = db.size or 36
@@ -932,6 +1193,7 @@ local sinceVisual = VISUAL_MIN_GAP
 frame:SetScript("OnUpdate", function(_, elapsed)
     local db = ns.db or _G.EzWoW_UtilityBarDB
     if not db then return end
+    ns.lastFrameElapsed = elapsed
 
     -- 0. The tooltip of the icon the mouse rests on (TOOLTIP_DELAY)
     if pendingTip and ToolbarController.tooltipDue(pendingTip, pendingTipDue, GetTime()) then
@@ -1069,6 +1331,7 @@ pcall(frame.RegisterEvent, frame, "ITEM_DATA_LOAD_RESULT")
 pcall(frame.RegisterEvent, frame, "CVAR_UPDATE")
 
 frame:SetScript("OnEvent", function(_, event, arg1)
+    if Flicker.on then Flicker.NoteEvent(event) end
     if event == "PLAYER_LOGIN" then
         ns:InitDB()
         if ns.db.position then
