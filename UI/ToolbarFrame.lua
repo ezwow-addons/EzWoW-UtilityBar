@@ -491,10 +491,19 @@ function ToolbarController.ItemUses(entry)
     local n = ns.GetSafeItemCount(entry.id, true)
     if not n then return nil, false end
     if n > 0 then
-        local casts = ns.ItemReagentCasts(entry.id)
+        local casts, takesReagents = ns.ItemReagentCasts(entry.id)
         if casts then return casts, true end
+        -- the uses are not known now (in combat the game gives them only as a secret value): the icon keeps
+        -- its number (it showed the item count instead: the Evergreen Pouch lost its number in combat)
+        if takesReagents then return nil, true end
     end
     return n, false
+end
+
+-- Casts left of a class skill that takes reagents (Rebirth needs a seed), as on the game's action bar
+-- (nil: it takes none, or the number is not known now), and true when it takes reagents (2026-11-27).
+function ToolbarController.SpellUses(entry)
+    return ns.SpellReagentCasts(entry.id)
 end
 
 function ToolbarController.BindEntryToButton(b, entry, size)
@@ -510,7 +519,9 @@ function ToolbarController.BindEntryToButton(b, entry, size)
     if entry.type == "item" and not entry.inventorySlot then
         local uses
         uses, byReagents = ToolbarController.ItemUses(entry)
-        n = uses or entry.count
+        n = uses or (not byReagents and entry.count) or nil
+    elseif entry.type == "spell" then
+        n, byReagents = ToolbarController.SpellUses(entry)
     end
     local isLow = db and db.lowStockWarn and entry.lowThreshold and n and n > 0 and n <= entry.lowThreshold
     if isLow then
@@ -520,7 +531,7 @@ function ToolbarController.BindEntryToButton(b, entry, size)
     else
         b.border:SetVertexColor(ToolbarController.GetEntryBorderColor(entry))
         b.count:SetTextColor(1, 1, 1)
-        b.count:SetText(entry.type == "item" and ToolbarController.CountText(entry, n, byReagents) or "")
+        b.count:SetText((entry.type == "item" or byReagents) and ToolbarController.CountText(entry, n, byReagents) or "")
     end
 
     b:SetAttribute("type", entry.type)
@@ -819,6 +830,18 @@ function ns:UpdateVisuals()
                             b.count:SetTextColor(1, 1, 1)
                             b.count:SetText(ToolbarController.CountText(b.entry, n, byReagents))
                         end
+                    end
+                    empty = (n == 0)
+                end
+            elseif b.entry.type == "spell" then
+                -- a class skill that takes reagents: the casts they allow, as on the game's action bar
+                local n, byReagents = ToolbarController.SpellUses(b.entry)
+                if n and byReagents then
+                    shownCount, shownByReagents = n, true
+                    if n ~= b.lastCount or b.lastByReagents ~= true then
+                        b.lastCount, b.lastLow, b.lastByReagents = n, false, true
+                        b.count:SetTextColor(1, 1, 1)
+                        b.count:SetText(ToolbarController.CountText(b.entry, n, true))
                     end
                     empty = (n == 0)
                 end

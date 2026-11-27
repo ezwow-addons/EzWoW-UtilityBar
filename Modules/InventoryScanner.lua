@@ -215,8 +215,39 @@ function ns.GetSafeItemCount(itemID, includeUses)
     return nil
 end
 
+-- Spells that take reagents (Rebirth needs a seed, the Evergreen Pouch's use Un'Goro Soil): the game's action
+-- bar counts the casts the reagents allow. Like the action bar, a spell gets a number when it consumes
+-- reagents (none left says 0) or when its reagents give it casts.
+-- -> casts (nil: unknown now; in combat the game gives that number only as a secret value),
+--    takesReagents (true / false; nil: no answer)
+local reagentSpellCache = {}   -- spell ID -> true: consumes reagents
+function ns.SpellReagentCasts(spellID)
+    spellID = tonumber(spellID)
+    if not spellID then return nil, nil end
+    local consumes = reagentSpellCache[spellID]
+    if not consumes then
+        local reagentFn = (C_Spell and C_Spell.IsConsumableSpell) or _G.IsConsumableSpell
+        if type(reagentFn) == "function" then
+            local ok, v = pcall(reagentFn, spellID)
+            if ok and v ~= nil and not ns.IsSecret(v) then
+                consumes = (v == true or v == 1)
+                if consumes then reagentSpellCache[spellID] = true end
+            end
+        end
+    end
+    local casts
+    local countFn = (C_Spell and C_Spell.GetSpellCastCount) or _G.GetSpellCount
+    if type(countFn) == "function" then
+        local okCount, c = pcall(countFn, spellID)
+        if okCount and type(c) == "number" and not ns.IsSecret(c) then casts = c end
+    end
+    if consumes or (casts and casts > 0) then return casts, true end
+    if consumes == false then return nil, false end
+    return nil, nil
+end
+
 -- Items whose use takes reagents (Evergreen Pouch needs Un'Goro Soil): the game's action bar counts the uses
--- the reagents allow, not the item (1 pouch and no soil says 0). nil: not such an item, or no answer.
+-- the reagents allow, not the item (1 pouch and no soil says 0). -> as ns.SpellReagentCasts for the item's use
 local itemSpellCache = {}      -- itemID -> spell ID of its use (false: none)
 function ns.ItemReagentCasts(itemID)
     local spellID = itemSpellCache[itemID]
@@ -231,16 +262,8 @@ function ns.ItemReagentCasts(itemID)
         spellID = id or false
         itemSpellCache[itemID] = spellID
     end
-    if not spellID then return nil end
-    local reagentFn = (C_Spell and C_Spell.IsConsumableSpell) or _G.IsConsumableSpell
-    if type(reagentFn) ~= "function" then return nil end
-    local ok, takesReagents = pcall(reagentFn, spellID)
-    if not ok or ns.IsSecret(takesReagents) or not takesReagents then return nil end
-    local countFn = (C_Spell and C_Spell.GetSpellCastCount) or _G.GetSpellCount
-    if type(countFn) ~= "function" then return nil end
-    local okCount, casts = pcall(countFn, spellID)
-    if okCount and type(casts) == "number" and not ns.IsSecret(casts) then return casts end
-    return nil
+    if not spellID then return nil, false end
+    return ns.SpellReagentCasts(spellID)
 end
 
 -- Items the game's action bar puts a number on even when one is left: used up when used (potions, quest
